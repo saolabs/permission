@@ -17,7 +17,7 @@ Request → kiểm tra các ô quyền cần thiết → Controller / Policy
 
 ## Trạng thái phát triển
 
-Package yêu cầu `saola/core:^2.0`, có `Saola\Core\Routing\Permission` và
+Package yêu cầu `saola/core:^2.1`, có `Saola\Core\Routing\Permission` và
 `System::permissionDeclarations()`. Core 1.x không tương thích. Package permission
 chưa có release riêng trên Packagist. Không cấu hình sibling path repository
 cho ứng dụng.
@@ -49,11 +49,29 @@ Permission::UPDATE;
 Permission::DELETE;
 Permission::RESTORE;
 Permission::FORCE_DELETE;
+Permission::EXTRA;
 ```
 
 Chỉ có một enum dùng chung. Khai báo bằng string như `permission('users.read')`
 hoặc `permission('read')` bị từ chối. String chỉ xuất hiện trong metadata/DB sau
 khi serialize hoặc giải mã dữ liệu đầu vào đã kiểm tra enum.
+
+`EXTRA` là một ô quyền chung cho các action đặc biệt trong cùng module. Developer
+chọn action nào tham gia bằng khai báo rõ ràng:
+
+EXTRA có từ core 2.1.0.
+
+```php
+$router->post('/export', [UserController::class, 'export'])
+    ->name('export')->permission(Permission::EXTRA);
+$router->post('/resend-invitations', [UserController::class, 'resendInvitations'])
+    ->name('resend-invitations')->permission(Permission::EXTRA);
+```
+
+Người quản trị cấp ô EXTRA của module User thì được thực hiện cả hai action này.
+Các action không gán EXTRA giữ nguyên điều kiện quyền đã khai báo; hệ thống không
+tự suy luận EXTRA từ tên action hay HTTP method. EXTRA không thay cho quyền CRUD
+và không mở quyền sang context/module/submodule khác.
 
 ## Khai báo route
 
@@ -164,7 +182,7 @@ Provider không tự load migration, không truy vấn bảng quyền khi boot, 
 bảng users. Migration tạo `roles`, `permissions`, `permission_role`,
 `role_assignments`. Bảng permissions lưu context, module_path, operation và khóa
 hash nội bộ của bộ ba để đối chiếu chính xác trên cả DB dùng collation không
-phân biệt hoa/thường. Giá trị operation là bảy thao tác dùng chung, không phải tên
+phân biệt hoa/thường. Giá trị operation là tám thao tác dùng chung, không phải tên
 quyền tùy ý do developer gõ cho từng module.
 
 Lệnh sync chỉ thêm ô chưa có, không xóa ô cũ, không cấp quyền cho role. Các action

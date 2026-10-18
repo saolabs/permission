@@ -6,7 +6,7 @@
     "authors": [{"name": "SaoLabs Team", "homepage": "https://saolabs.dev"}],
     "require": {
         "php": "^8.2",
-        "saola/core": "^2.0"
+        "saola/core": "^2.1"
     },
     "require-dev": {
         "orchestra/testbench": "^10.0 || ^11.0",

@@ -8,6 +8,7 @@ use Saola\Core\Routing\Permission;
 use Saola\Core\System;
 use Saola\Permission\Data\PermissionRequirement;
 use Saola\Permission\Http\Middleware\RequirePermission;
+use Saola\Permission\Models\Permission as Grant;
 use Saola\Permission\Models\Role;
 use Saola\Permission\Tests\Fixtures\Subject;
 use Saola\Permission\Tests\TestCase;
@@ -55,6 +56,36 @@ class MiddlewareGateTest extends TestCase
         $this->call('HEAD', '/admin/users/profile')->assertOk();
         $role->revokePermissionTo('admin', [], Permission::ACCESS);
         $this->getJson('/admin/users/profile')->assertForbidden();
+    }
+
+    public function test_extra_is_shared_only_by_explicitly_marked_actions_in_the_exact_module(): void
+    {
+        $context = System::admin(['prefix' => 'admin', 'permission' => Permission::ACCESS, 'middleware' => ['saola.permission.route']]);
+        $module = $context->module('tools');
+        $module->get('/', fn () => 'ok')->name('index')->permission(Permission::READ);
+        $module->post('/export', fn () => 'ok')->name('export')->permission(Permission::EXTRA);
+        $module->post('/rebuild', fn () => 'ok')->name('rebuild')->permission(Permission::EXTRA);
+        $module->post('/diagnostics', fn () => 'ok')->name('diagnostics');
+        $module->sub('jobs', ['as' => 'jobs'])->post('/rebuild', fn () => 'ok')->name('rebuild')->permission(Permission::EXTRA);
+        $context->pushLaravelRoute();
+        $this->artisan('saola:permission:sync')->assertSuccessful();
+        $this->assertSame(2, Grant::where('operation', Permission::EXTRA->value)->count());
+        $role = Role::create(['name' => 'operator'])
+            ->grantPermissionTo('admin', [], Permission::ACCESS)
+            ->grantPermissionTo('admin', ['tools'], Permission::READ);
+        $subject = Subject::create([])->assignRole($role);
+        $this->actingAs($subject)->getJson('/admin/tools')->assertOk();
+        $this->postJson('/admin/tools/diagnostics')->assertOk();
+        $this->postJson('/admin/tools/export')->assertForbidden();
+        $this->postJson('/admin/tools/rebuild')->assertForbidden();
+        $role->grantPermissionTo('admin', ['tools'], Permission::EXTRA);
+        $this->postJson('/admin/tools/export')->assertOk();
+        $this->postJson('/admin/tools/rebuild')->assertOk();
+        $this->postJson('/admin/tools/jobs/rebuild')->assertForbidden();
+        $role->revokePermissionTo('admin', ['tools'], Permission::EXTRA);
+        $this->postJson('/admin/tools/export')->assertForbidden();
+        $this->postJson('/admin/tools/rebuild')->assertForbidden();
+        $this->getJson('/admin/tools')->assertOk();
     }
 
     public function test_route_with_empty_requirements_is_public(): void
