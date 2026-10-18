@@ -1,0 +1,62 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        $tables = config('permission.tables');
+        $schema = Schema::connection(config('permission.connection'));
+        $keyType = config('permission.subject_key_type', 'int');
+        if (! in_array($keyType, ['int', 'uuid', 'ulid', 'string'], true)) {
+            throw new InvalidArgumentException('Invalid permission.subject_key_type.');
+        }
+
+        $schema->create($tables['roles'], function (Blueprint $table) {
+            $table->id();
+            $table->string('name')->unique();
+            $table->string('description')->nullable();
+            $table->timestamps();
+        });
+        $schema->create($tables['permissions'], function (Blueprint $table) {
+            $table->id();
+            // Canonical tuple hash keeps matching exact on databases with case-insensitive collations.
+            $table->string('scope_key', 64)->unique();
+            $table->string('context', 64);
+            $table->string('module_path', 512);
+            $table->string('operation', 32);
+            $table->string('description')->nullable();
+            $table->timestamps();
+        });
+        $schema->create($tables['permission_role'], function (Blueprint $table) use ($tables) {
+            $table->foreignId('permission_id')->constrained($tables['permissions'])->cascadeOnDelete();
+            $table->foreignId('role_id')->constrained($tables['roles'])->cascadeOnDelete();
+            $table->primary(['permission_id', 'role_id']);
+        });
+        $schema->create($tables['role_assignments'], function (Blueprint $table) use ($tables, $keyType) {
+            $table->foreignId('role_id')->constrained($tables['roles'])->cascadeOnDelete();
+            $table->string('subject_type');
+            match ($keyType) {
+                'int' => $table->unsignedBigInteger('subject_id'),
+                'uuid' => $table->uuid('subject_id'),
+                'ulid' => $table->ulid('subject_id'),
+                'string' => $table->string('subject_id', 191),
+            };
+            $table->primary(['role_id', 'subject_id', 'subject_type']);
+            $table->index(['subject_id', 'subject_type']);
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        $tables = config('permission.tables');
+        $schema = Schema::connection(config('permission.connection'));
+        foreach (['role_assignments', 'permission_role', 'permissions', 'roles'] as $table) {
+            $schema->dropIfExists($tables[$table]);
+        }
+    }
+};
