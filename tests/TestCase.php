@@ -3,6 +3,7 @@
 namespace Saola\Permission\Tests;
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Saola\Core\Http\Middleware\Next;
@@ -25,6 +26,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('database.connections.testing', [
             'driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => true,
         ]);
+        // A shared store, like Redis in production; the array store is deliberately ignored by the manager.
+        $app['config']->set('permission.cache.store', 'file');
         $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
     }
 
@@ -32,6 +35,7 @@ abstract class TestCase extends Orchestra
     {
         parent::setUp();
         System::reset();
+        Cache::store('file')->flush();
         // Saola applications register this pass-through alias in bootstrap/app.php.
         $this->app['router']->aliasMiddleware('next', Next::class);
     }

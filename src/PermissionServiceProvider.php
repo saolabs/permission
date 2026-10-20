@@ -16,7 +16,8 @@ class PermissionServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/permission.php', 'permission');
-        $this->app->scoped(PermissionRegistry::class);
+        // Route metadata is static after boot; the manager keeps per-request memos only.
+        $this->app->singleton(PermissionRegistry::class);
         $this->app->scoped(PermissionManager::class);
     }
 

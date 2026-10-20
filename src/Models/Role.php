@@ -8,6 +8,7 @@ use LogicException;
 use Saola\Core\Models\Model;
 use Saola\Core\Routing\Permission as Operation;
 use Saola\Permission\Data\PermissionRequirement;
+use Saola\Permission\Services\PermissionManager;
 
 class Role extends Model
 {
@@ -19,6 +20,7 @@ class Role extends Model
             $role->permissions()->detach();
             DB::connection($role->getConnectionName())->table(config('permission.tables.role_assignments'))
                 ->where('role_id', $role->getKey())->delete();
+            app(PermissionManager::class)->forgetRoles($role->getKey());
         });
     }
 
@@ -40,6 +42,7 @@ class Role extends Model
     public function grantPermissionTo(string $context, array $modulePath, Operation $permission, Operation ...$permissions): static
     {
         $this->permissions()->syncWithoutDetaching($this->permissionIds($context, $modulePath, [$permission, ...$permissions]));
+        app(PermissionManager::class)->forgetRoles($this->getKey());
 
         return $this;
     }
@@ -47,6 +50,7 @@ class Role extends Model
     public function revokePermissionTo(string $context, array $modulePath, Operation $permission, Operation ...$permissions): static
     {
         $this->permissions()->detach($this->permissionIds($context, $modulePath, [$permission, ...$permissions]));
+        app(PermissionManager::class)->forgetRoles($this->getKey());
 
         return $this;
     }
@@ -64,6 +68,7 @@ class Role extends Model
             $this->permissions()->detach(array_values(array_diff($existing, $ids)));
             $this->permissions()->syncWithoutDetaching($ids);
         });
+        app(PermissionManager::class)->forgetRoles($this->getKey());
 
         return $this;
     }

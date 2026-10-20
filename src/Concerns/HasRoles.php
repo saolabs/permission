@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Saola\Core\Routing\Permission;
 use Saola\Permission\Data\PermissionRequirement;
 use Saola\Permission\Models\Role;
+use Saola\Permission\Services\PermissionManager;
 
 trait HasRoles
 {
@@ -18,6 +19,7 @@ trait HasRoles
             if (! $soft || $subject->isForceDeleting()) {
                 $subject->roles()->detach();
             }
+            app(PermissionManager::class)->forgetSubject($subject);
         });
     }
 
@@ -30,6 +32,7 @@ trait HasRoles
     public function assignRole(string|Role ...$roles): static
     {
         $this->roles()->syncWithoutDetaching($this->permissionRoleIds($roles));
+        app(PermissionManager::class)->forgetSubject($this);
 
         return $this;
     }
@@ -37,6 +40,7 @@ trait HasRoles
     public function removeRole(string|Role ...$roles): static
     {
         $this->roles()->detach($this->permissionRoleIds($roles));
+        app(PermissionManager::class)->forgetSubject($this);
 
         return $this;
     }
@@ -44,6 +48,7 @@ trait HasRoles
     public function syncRoles(string|Role ...$roles): static
     {
         $this->roles()->sync($this->permissionRoleIds($roles));
+        app(PermissionManager::class)->forgetSubject($this);
 
         return $this;
     }
@@ -55,9 +60,7 @@ trait HasRoles
 
     public function hasPermissionTo(string $context, array $modulePath, Permission $permission): bool
     {
-        $requirement = new PermissionRequirement($context, $modulePath, $permission);
-
-        return $this->roles()->whereHas('permissions', fn ($query) => $query->matching($requirement))->exists();
+        return app(PermissionManager::class)->allowsAll($this, [new PermissionRequirement($context, $modulePath, $permission)]);
     }
 
     private function permissionRoleIds(array $roles): array

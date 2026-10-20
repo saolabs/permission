@@ -9,6 +9,9 @@ use Saola\Permission\Data\PermissionRequirement;
 
 class PermissionRegistry
 {
+    /** Route name => matrix rows. Bounded by route count, so it is safe to keep for a whole Octane worker. */
+    private ?array $routes = null;
+
     /** @return list<array{context:string,module_path:array,operation:string}> */
     public function catalog(?string $context = null): array
     {
@@ -30,13 +33,29 @@ class PermissionRegistry
 
     public function forRoute(?string $name, string $method): array
     {
-        $matches = array_values(array_filter($this->matrix(), fn ($row) => $name !== null && $name !== ''
-            && $row['route_name'] === $name && in_array(strtoupper($method), $row['methods'], true)));
+        // Rebuild once on a miss: routes registered after the first lookup must still resolve.
+        if ($name !== null && ! isset($this->routes()[$name])) {
+            $this->routes = null;
+        }
+        $matches = array_values(array_filter($this->routes()[$name ?? ''] ?? [],
+            fn ($row) => $name !== '' && in_array(strtoupper($method), $row['methods'], true)));
         if (count($matches) !== 1) {
             throw new LogicException('Route permission middleware requires a unique, named System action: '.($name ?? '(unnamed)'));
         }
 
         return $matches[0];
+    }
+
+    private function routes(): array
+    {
+        if ($this->routes === null) {
+            $this->routes = [];
+            foreach ($this->matrix() as $row) {
+                $this->routes[$row['route_name'] ?? ''][] = $row;
+            }
+        }
+
+        return $this->routes;
     }
 
     private function walk(array $node, string $context, array $modules, array $inherited, string $prefix, array &$rows): void

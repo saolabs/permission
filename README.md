@@ -231,9 +231,27 @@ $user->syncRoles();         // Gỡ mọi role của User.
 ```
 
 Ô quyền phải được đăng ký trước khi cấp; grant không tự tạo ô ngoài catalog.
-Model tham gia quan hệ phải được lưu trước. Mỗi lần kiểm tra đọc lại grant,
-không dùng quan hệ đã load làm cache quyền. Thu hồi có hiệu lực ở lần kiểm tra
-kế tiếp. Controller/service quản trị phải kiểm tra quyền trước khi sửa role hoặc
+Model tham gia quan hệ phải được lưu trước. Quan hệ đã load không được dùng làm
+cache quyền. Thay đổi qua API của package có hiệu lực ở lần kiểm tra kế tiếp.
+
+## Cache
+
+```php
+'cache' => ['store' => null, 'ttl' => 300], // config/permission.php
+```
+
+- Ma trận route: `PermissionRegistry` là singleton, index theo tên route được dựng
+  một lần mỗi worker Octane (FPM: một lần mỗi request, không query). Route đăng ký
+  muộn được nhận khi tra trượt.
+- Quyền: mỗi role một key (`saola.permission.role.{id}` → scope key), mỗi User một
+  key (`saola.permission.subject.{morph}.{id}` → role id), sống `ttl` giây trong
+  cache store ngoài. Request kế tiếp kiểm tra quyền không cần query.
+- Trong process chỉ có memo của `PermissionManager` (scoped), bị bỏ sau mỗi request
+  nên Octane không giữ dữ liệu theo User. Store `array` bị bỏ qua vì nằm trong RAM
+  worker, phình theo số User và lệch giữa các worker. `ttl = 0` tắt cache.
+- `grant/revoke/syncPermissions`, `assignRole/removeRole/syncRoles`, xóa role/ô quyền
+  hay xóa User tự xóa key liên quan. Sửa trực tiếp bảng quyền bằng query builder thì
+  chờ hết `ttl` hoặc `php artisan cache:clear`. Controller/service quản trị phải kiểm tra quyền trước khi sửa role hoặc
 gán role cho User.
 
 Xóa User qua Eloquent events dọn assignment khi hard delete và giữ lại khi soft

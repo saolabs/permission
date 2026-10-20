@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Saola\Core\Models\Model;
 use Saola\Core\Routing\Permission as Operation;
 use Saola\Permission\Data\PermissionRequirement;
+use Saola\Permission\Services\PermissionManager;
 
 class Permission extends Model
 {
@@ -24,6 +25,10 @@ class Permission extends Model
             $permission->module_path = $requirement->modulePath;
             $permission->scope_key = $requirement->storageAttributes()['scope_key'];
         });
+        // Roles cache scope keys; a renamed or deleted cell must drop them. deleting: the pivot cascades away.
+        $forget = fn (self $permission) => app(PermissionManager::class)->forgetRoles(...$permission->roles()->allRelatedIds()->all());
+        static::updated($forget);
+        static::deleting($forget);
     }
 
     public function getTable()
