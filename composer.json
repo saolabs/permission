@@ -6,17 +6,20 @@
     "authors": [{"name": "SaoLabs Team", "homepage": "https://saolabs.dev"}],
     "require": {
         "php": "^8.2",
-        "saola/core": "^2.1"
+        "saola/core": "^2.2"
     },
     "require-dev": {
         "orchestra/testbench": "^10.0 || ^11.0",
         "phpunit/phpunit": "^11.0 || ^12.0"
     },
-    "autoload": {"psr-4": {"Saola\\Permission\\": "src/"}},
+    "autoload": {"psr-4": {"Saola\\Permission\\": "src/"}, "files": ["helpers.php"]},
     "autoload-dev": {"psr-4": {"Saola\\Permission\\Tests\\": "tests/"}},
-    "extra": {"laravel": {"providers": ["Saola\\Permission\\PermissionServiceProvider"]}},
+    "extra": {
+        "laravel": {"providers": ["Saola\\Permission\\PermissionServiceProvider"]},
+        "saola": {"directives": "sao.directives.php", "client": "dist/client.js"}
+    },
     "scripts": {
-        "test": "phpunit",
+        "test": ["phpunit", "node --test tests/js/*.test.mjs"],
         "check": ["composer validate --strict --no-interaction", "composer audit --locked", "@test"]
     },
     "config": {"sort-packages": true},

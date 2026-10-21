@@ -257,6 +257,34 @@ gán role cho User.
 Xóa User qua Eloquent events dọn assignment khi hard delete và giữ lại khi soft
 delete. Bulk delete qua query builder bỏ qua events, ứng dụng phải tự dọn.
 
+## Ẩn giao diện theo quyền: `canRoute` và `#permission`
+
+Gói khai báo đủ bốn mảnh cho view `.sao`, nên cài gói là dùng được:
+
+```blade
+<button #permission="'admin.roles.destroy'">Xoá</button>   {{-- thẻ nào cũng được --}}
+@if(canRoute('admin.mail.index')) <a href="/admin/mail">Email</a> @endif
+```
+
+Giá trị là **tên route**, không đọc `href`: cùng một URL có thể khác quyền theo
+method, và `div` không có `href`. `canRoute(tên)` đúng khi người dùng hiện tại
+qua được mọi quyền mà route đó khai báo — cùng luật với `saola.permission.route`.
+
+| Mảnh | File | Nạp bởi |
+|---|---|---|
+| `canRoute()` PHP (Blade/SSR) | `helpers.php` | `autoload.files` |
+| `canRoute()` JS (`App.Helper`) | `dist/client.js` | `extra.saola.client` + `php artisan saola:assets` |
+| Dữ liệu cho bản JS | `Saola::share('permission', …)` trong provider | `APP_CONFIGS.shared` → `App.shared('permission')` |
+| `#permission`, `Sao::helper('canRoute')` | `sao.directives.php` | `extra.saola.directives` (saola/compiler) |
+
+- **Chỉ là lớp giao diện.** Middleware ở server vẫn là chỗ chặn thật; người dùng
+  sửa JS thì nút hiện lại nhưng bấm vẫn 403.
+- **Tên route sai:** PHP ném `InvalidArgumentException` khi `app.debug`, trả
+  `false` ở production; JS `console.warn` một lần.
+- **Quyền đổi giữa phiên:** danh sách phía JS cập nhật ở lần tải trang kế tiếp.
+- App cần `"post-autoload-dump": ["@php artisan saola:assets"]` để bundle client
+  luôn được publish sau `composer install/update`.
+
 ## Middleware trực tiếp, Gate và Policy
 
 ```php
